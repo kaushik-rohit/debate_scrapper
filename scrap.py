@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import urllib.request as request
 from urllib.parse import urljoin
+from urllib.error import HTTPError
 import json
 
 
@@ -23,13 +24,17 @@ def get_utterance_text(link):
 	link_param = link.split('#')
 	url = link_param[0]
 	anchor_name = link_param[1]
-
-	speech_html = request.urlopen(url)
-	soup = BeautifulSoup(speech_html)
-	anchor = soup.find('a', {'class': 'anchor', 'name':anchor_name})
-	para = anchor.parent
 	
-	return para.get_text().replace('\n', ' ')
+	try:
+		speech_html = request.urlopen(url)
+		soup = BeautifulSoup(speech_html, features='lxml')
+	except HTTPError as e:
+		print(e.code)
+	else:
+		anchor = soup.find('a', {'class': 'anchor', 'name':anchor_name})
+		para = anchor.parent
+		
+		return para.get_text().replace('\n', ' ')
 	
 		
 def parse_debate_for_date(date):
@@ -41,35 +46,36 @@ def parse_debate_for_date(date):
 	
 	try:
 		debate_page_html = request.urlopen(debate_page)
-		soup = BeautifulSoup(debate_page_html)
-	except urllib.error.HTTPError:
-	    print 'We failed with error code - %s.' % e.code
+		soup = BeautifulSoup(debate_page_html, features='lxml')
+	except HTTPError as e:
+	    print('We failed with error code - {}.'.format(e.code))
+	    data.append('No Debate for this date')
+	else:
+		title = soup.find('meta', {'name': 'title'})
 
-    	if e.code == 404:
-        	# do stuff..  
-    	else:
-        	# other stuff...
-	
-	for para in soup.findAll('p'):
-		link = para.find('a', {'shape': 'rect'}, href=True)
-		
-		if link is None:
-			continue
-		
-		utterance = {'speaker': '', 'speech':''}
-		
-		speaker = link.find('b').get_text()
-		speaker = speaker.replace('\n', ' ')
-		href = urljoin(debate_page, link['href'])
-		speech = get_utterance_text(href)
-		
-		utterance['speaker'] = speaker
-		utterance['speech'] = speech
-		data.append(utterance)
-		
+		if title is not None and title['content'] == 'Page cannot be found':
+			data.append('No Debate for this date')
+		else:
+			for para in soup.findAll('p'):
+				link = para.find('a', {'shape': 'rect'}, href=True)
+				
+				if link is None:
+					continue
+				
+				utterance = {'speaker': '', 'speech':''}
+				
+				speaker = link.find('b').get_text()
+				speaker = speaker.replace('\n', ' ')
+				href = urljoin(debate_page, link['href'])
+				speech = get_utterance_text(href)
+				
+				utterance['speaker'] = speaker
+				utterance['speech'] = speech
+				data.append(utterance)
+			
 	filename = date.strftime('%Y-%m-%d')
 	filepath = './data/{}.json'.format(filename)
-	
+		
 	with open(filepath, 'w') as f:
 		json.dump(data, f)
 
@@ -79,6 +85,7 @@ def get_debate_for_period(start_date, end_date):
 	delta = timedelta(days=1)
 	date_iter = start_date
 	while date_iter <= end_date:
+		print('Scrapping debates for date ', date_iter.strftime('%Y-%m-%d'))		
 		parse_debate_for_date(date_iter)
 		date_iter += delta
 	
