@@ -24,6 +24,7 @@ def get_utterance_text(link):
 	link_param = link.split('#')
 	url = link_param[0]
 	anchor_name = link_param[1]
+	print('    {}   anchor  {}'.format(url, anchor_name))
 	
 	try:
 		speech_html = request.urlopen(url)
