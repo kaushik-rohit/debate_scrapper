@@ -1,11 +1,10 @@
-from dateutil import rrule
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import urllib.request as request
 from urllib.parse import urljoin
 from urllib.error import HTTPError
 import json
-
+import time
 
 
 HOME_PAGE = 'https://www.parliament.uk/business/publications/hansard/commons/by-date/#session=27&year={}&month={}&day={}'
@@ -57,10 +56,8 @@ def parse_debate_for_date(date):
 		if title is not None and title['content'] == 'Page cannot be found':
 			data.append('No Debate for this date')
 		else:
-			for para in soup.findAll('p'):
-				link = para.find('a', {'shape': 'rect'}, href=True)
-				
-				if link is None:
+			for link in soup.findAll('a', {'shape': 'rect'}, href=True):
+				if link.parent is None or link.parent.name != 'p':
 					continue
 				
 				utterance = {'speaker': '', 'speech':''}
@@ -71,7 +68,7 @@ def parse_debate_for_date(date):
 				speech = get_utterance_text(href)
 				
 				utterance['speaker'] = speaker
-				utterance['speech'] = speech
+				utterance['speech'] = speech.replace(speaker, '')
 				data.append(utterance)
 			
 	filename = date.strftime('%Y-%m-%d')
@@ -92,6 +89,6 @@ def get_debate_for_period(start_date, end_date):
 	
 	
 if __name__ == '__main__':
-	start_date = datetime(2016, 1, 1) #1st Jan 2016
-	end_date = datetime(2016, 1, 31) #31st Jan 2016
+	start_date = datetime(2016, 2, 4) #1st Feb 2016
+	end_date = datetime(2016, 2, 28) #31st Jan 2016
 	get_debate_for_period(start_date, end_date)
